@@ -6,7 +6,7 @@ import { c as relationLine, l as relationTitle, n as LEVEL_META, o as isLevel, t
 import { r as Star, t as X } from "../_libs/lucide-react.mjs";
 import { n as toast, t as Toaster } from "../_libs/sonner.mjs";
 import { n as create, t as persist } from "../_libs/zustand.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-BxmM1iJt.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-CK-5Vhgj.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var createSsrRpc = (functionId) => {
@@ -1020,6 +1020,7 @@ function SystemSheet({ project, direction, parent, pending, ai, notice, onClose,
 	const [noteOpen, setNoteOpen] = (0, import_react.useState)(false);
 	const [instruction, setInstruction] = (0, import_react.useState)("");
 	const [confirmRemove, setConfirmRemove] = (0, import_react.useState)(false);
+	const [heldFile, setHeldFile] = (0, import_react.useState)(null);
 	const vars = brandVars(direction);
 	const ink = colorOf(direction, "ink").hex;
 	const canvas = colorOf(direction, "canvas").hex;
@@ -1033,26 +1034,47 @@ function SystemSheet({ project, direction, parent, pending, ai, notice, onClose,
 		setInstruction("");
 		setNoteOpen(false);
 		setConfirmRemove(false);
+		setHeldFile(null);
 	}, [direction.id]);
+	(0, import_react.useEffect)(() => {
+		if (!heldFile) return;
+		const node = document.getElementById("g-held-file");
+		if (!(node instanceof HTMLTextAreaElement)) return;
+		node.focus();
+		node.select();
+	}, [heldFile]);
 	async function copy(text, label) {
 		try {
 			await navigator.clipboard.writeText(text);
 			toast(label);
 		} catch {
-			toast("Couldn’t copy from this browser. Download the file instead.");
+			toast("Couldn’t copy from this browser.");
 		}
 	}
-	function download() {
+	function onDownload() {
+		const filename = `${exportBasename(project, direction)}.md`;
 		const text = markdownOf(project, direction);
-		const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement("a");
-		link.href = url;
-		link.download = `${exportBasename(project, direction)}.md`;
-		document.body.appendChild(link);
-		link.click();
-		link.remove();
-		URL.revokeObjectURL(url);
+		if (window.parent === window) {
+			toast(`Downloading ${filename}`);
+			return;
+		}
+		const reveal = () => {
+			setHeldFile(text);
+			toast(`Can’t save a file from this preview. Select ${filename} below.`);
+		};
+		try {
+			const write = navigator.clipboard?.writeText?.(text);
+			if (!write) {
+				reveal();
+				return;
+			}
+			write.then(() => {
+				setHeldFile(null);
+				toast(`Copied ${filename}. Paste it if no file saved.`);
+			}, reveal);
+		} catch {
+			reveal();
+		}
 	}
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
 		className: "g-sheet-head",
@@ -1550,14 +1572,24 @@ function SystemSheet({ project, direction, parent, pending, ai, notice, onClose,
 								onClick: () => void copy(markdownOf(project, direction), "Design system copied"),
 								children: "Copy markdown"
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-								type: "button",
-								className: "g-btn g-btn-ghost",
-								onClick: download,
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+								className: "g-btn g-btn-ghost inline-flex items-center justify-center no-underline",
+								href: `data:text/markdown;charset=utf-8,${encodeURIComponent(markdownOf(project, direction))}`,
+								download: `${exportBasename(project, direction)}.md`,
+								onClick: onDownload,
 								children: "Download"
 							})
 						]
 					}),
+					heldFile ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+						id: "g-held-file",
+						className: "g-field mt-3 font-mono text-xs",
+						readOnly: true,
+						rows: 8,
+						value: heldFile,
+						"aria-label": "Design system file",
+						onFocus: (event) => event.currentTarget.select()
+					}) : null,
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", {
 						className: "g-pre mt-3",
 						children: cssExport(project, direction)

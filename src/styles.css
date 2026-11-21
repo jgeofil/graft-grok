@@ -156,6 +156,14 @@
   border-color: var(--color-line);
 }
 
+a.g-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .g-btn-ghost.is-on {
   background: var(--color-ink);
   color: var(--color-paper);

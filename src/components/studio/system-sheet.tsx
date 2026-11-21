@@ -42,6 +42,7 @@ export function SystemSheet({
   const [noteOpen, setNoteOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [heldFile, setHeldFile] = useState<string | null>(null);
   const vars = brandVars(direction);
   const ink = colorOf(direction, "ink").hex;
   const canvas = colorOf(direction, "canvas").hex;
@@ -56,28 +57,53 @@ export function SystemSheet({
     setInstruction("");
     setNoteOpen(false);
     setConfirmRemove(false);
+    setHeldFile(null);
   }, [direction.id]);
+
+  useEffect(() => {
+    if (!heldFile) return;
+    const node = document.getElementById("g-held-file");
+    if (!(node instanceof HTMLTextAreaElement)) return;
+    node.focus();
+    node.select();
+  }, [heldFile]);
 
   async function copy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
       toast(label);
     } catch {
-      toast("Couldn’t copy from this browser. Download the file instead.");
+      toast("Couldn’t copy from this browser.");
     }
   }
 
-  function download() {
+  function onDownload() {
+    const filename = `${exportBasename(project, direction)}.md`;
     const text = markdownOf(project, direction);
-    const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${exportBasename(project, direction)}.md`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    if (window.parent === window) {
+      toast(`Downloading ${filename}`);
+      return;
+    }
+    const reveal = () => {
+      setHeldFile(text);
+      toast(`Can’t save a file from this preview. Select ${filename} below.`);
+    };
+    try {
+      const write = navigator.clipboard?.writeText?.(text);
+      if (!write) {
+        reveal();
+        return;
+      }
+      void write.then(
+        () => {
+          setHeldFile(null);
+          toast(`Copied ${filename}. Paste it if no file saved.`);
+        },
+        reveal,
+      );
+    } catch {
+      reveal();
+    }
   }
 
   return (
@@ -353,10 +379,26 @@ export function SystemSheet({
             >
               Copy markdown
             </button>
-            <button type="button" className="g-btn g-btn-ghost" onClick={download}>
+            <a
+              className="g-btn g-btn-ghost inline-flex items-center justify-center no-underline"
+              href={`data:text/markdown;charset=utf-8,${encodeURIComponent(markdownOf(project, direction))}`}
+              download={`${exportBasename(project, direction)}.md`}
+              onClick={onDownload}
+            >
               Download
-            </button>
+            </a>
           </div>
+          {heldFile ? (
+            <textarea
+              id="g-held-file"
+              className="g-field mt-3 font-mono text-xs"
+              readOnly
+              rows={8}
+              value={heldFile}
+              aria-label="Design system file"
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          ) : null}
           <pre className="g-pre mt-3">{cssExport(project, direction)}</pre>
         </section>
 
