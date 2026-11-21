@@ -208,6 +208,16 @@ textarea.g-field {
   border-color: var(--color-ink);
 }
 
+.g-levels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.g-levels .g-chip {
+  width: 100%;
+}
+
 .g-project,
 .g-kept {
   display: flex;

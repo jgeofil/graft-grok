@@ -1,4 +1,4 @@
-//#region node_modules/.nitro/vite/services/ssr/assets/model-DHGwHpx0.js
+//#region node_modules/.nitro/vite/services/ssr/assets/model-BBCco-ZW.js
 var ROLES = [
 	"canvas",
 	"surface",
@@ -67,6 +67,26 @@ var DENSITIES = [
 	"balanced",
 	"airy"
 ];
+var ASPECTS = [
+	"palette",
+	"type",
+	"radius",
+	"density",
+	"voice",
+	"imagery",
+	"shape",
+	"motion"
+];
+var ASPECT_LABEL = {
+	palette: "Palette",
+	type: "Type",
+	radius: "Radius",
+	density: "Density",
+	voice: "Voice",
+	imagery: "Imagery",
+	shape: "Shape",
+	motion: "Motion"
+};
 var SERIF = /* @__PURE__ */ new Set([
 	"Fraunces",
 	"Newsreader",
@@ -79,6 +99,9 @@ var SERIF = /* @__PURE__ */ new Set([
 	"Libre Baskerville",
 	"DM Serif Display"
 ]);
+function isSerifFont(family) {
+	return SERIF.has(family);
+}
 var WEIGHTS = {
 	Fraunces: "500;700",
 	Newsreader: "400;600",
@@ -402,4 +425,4 @@ function descendantIds(directions, id) {
 	return ids;
 }
 //#endregion
-export { TRAITS as a, columnsOf as c, finalizePalette as d, formatRatio as f, TEXT_FONTS as i, descendantIds as l, toSeeds as m, MONO_FONTS as n, brandVars as o, slugify as p, ROLE_LABEL as r, colorOf as s, BASE_FONT_HREF as t, extraFontHref as u };
+export { isSerifFont as _, MONO_FONTS as a, TEXT_FONTS as c, colorOf as d, columnsOf as f, formatRatio as g, finalizePalette as h, DENSITIES as i, TRAITS as l, extraFontHref as m, ASPECT_LABEL as n, RADII as o, descendantIds as p, BASE_FONT_HREF as r, ROLE_LABEL as s, ASPECTS as t, brandVars as u, slugify as v, toSeeds as y };

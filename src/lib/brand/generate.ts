@@ -7,12 +7,22 @@ import {
   type Brief,
   type DirectionSeed,
 } from "@/lib/brand/model";
+import {
+  LEVEL_META,
+  applyLineage,
+  describePlans,
+  diffLineage,
+  isLevel,
+  plansFor,
+  type Level,
+  type LineageMark,
+} from "@/lib/brand/lineage";
 
 export type GenerateResult =
-  | { ok: true; directions: DirectionSeed[] }
+  | { ok: true; directions: DirectionSeed[]; lineage: LineageMark[] }
   | { ok: false; error: string };
 
-type Mode = "seed" | "branch" | "refine";
+type Mode = "seed" | Level;
 
 type GenerateInput = {
   mode: Mode;
@@ -47,8 +57,12 @@ Direction rules:
 - Never produce a purple-gradient SaaS look, glassmorphism, or a wordmark that depends on an icon.
 
 When drafting several directions, they must differ in hue family, type pairing, and radius. Three tints of one idea are a failure.
-When branching, stay recognizably related to the parent by one anchor (metaphor, hue family, typeface, or radius) and change at least two of: field color, accent, type pairing, radius, density. Do not copy the parent's hex values.
-When refining, obey the instruction and keep what it does not mention.`;
+When a parent is present, the user message assigns every aspect of every direction as LOCKED, LIGHT, or STRONG. Obey that assignment. It is how the parent stays visible.
+LOCKED means copy the parent: same hex values, same font names, same radius, same density, same sentences.
+LIGHT means one step inside the parent's family. Do not change hue family, type class, or the metaphor.
+STRONG means new, and still a consequence of whatever is locked. A new palette has to live with a locked serif. A new voice has to live with a locked palette.
+The epithet names the actual move. Do not use the words polish, mutate, sibling, remix, creative, or cousin.
+On a polish, an instruction unlocks only the aspects it names, and only as a small step. On every other level, an instruction never unlocks a locked aspect.`;
 
 function clip(value: unknown, max: number): string {
   if (typeof value !== "string") return "";
@@ -75,9 +89,16 @@ function parseParent(value: unknown): DirectionSeed | undefined {
   return seeds[0];
 }
 
+function parseMode(value: unknown): Mode {
+  if (value === "refine" || value === "polish") return "polish";
+  if (value === "branch" || value === "siblings") return "siblings";
+  if (typeof value === "string" && isLevel(value)) return value;
+  return "seed";
+}
+
 function parseInput(input: unknown): GenerateInput {
   const record = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
-  const mode: Mode = record.mode === "branch" || record.mode === "refine" ? record.mode : "seed";
+  const mode = parseMode(record.mode);
   const brief = parseBrief(record.brief);
   if (!brief.name || !brief.category) {
     throw new Error("Add a name and what the brand is before drafting.");
@@ -87,9 +108,6 @@ function parseInput(input: unknown): GenerateInput {
     throw new Error("Choose a direction to branch from.");
   }
   const instruction = clip(record.instruction, 400);
-  if (mode === "refine" && instruction.length < 3) {
-    throw new Error("Write an instruction to refine this direction.");
-  }
   return { mode, brief, parent, instruction };
 }
 
@@ -167,8 +185,8 @@ function directionSchema() {
   };
 }
 
-function userPrompt(input: GenerateInput): string {
-  const count = input.mode === "refine" ? 1 : 3;
+function userPrompt(input: GenerateInput, plans: ReturnType<typeof plansFor> | null): string {
+  const count = input.mode === "seed" ? 3 : LEVEL_META[input.mode].count;
   const lines = [
     `Brand name: ${input.brief.name}`,
     `What it is: ${input.brief.category}`,
@@ -184,10 +202,21 @@ function userPrompt(input: GenerateInput): string {
   if (input.parent) {
     lines.push(`Parent direction:\n${JSON.stringify(input.parent)}`);
   }
+  if (plans) {
+    lines.push(describePlans(plans));
+    if (input.mode === "polish") {
+      lines.push(
+        input.instruction
+          ? "Apply the instruction as a small tweak to the LIGHT aspects only. Name that tweak in the epithet and rationale. Copy every LOCKED aspect from the parent, including hex values and font names."
+          : "No instruction. Change only the editorial layer: title, epithet, rationale, wordmarkStyle, typeNotes, uiNotes, dos, and donts. Do not restyle the system.",
+      );
+    }
+  }
   if (input.instruction) {
-    lines.push(`Instruction: ${input.instruction}`);
-  } else if (input.mode === "branch") {
-    lines.push("Choose three different axes yourself. Name each axis in the epithet.");
+    lines.push(
+      `Instruction: ${input.instruction}`,
+      "Follow the instruction only where the aspect is LIGHT or STRONG. Leave LOCKED aspects copied from the parent.",
+    );
   }
   return lines.filter(Boolean).join("\n");
 }
@@ -214,12 +243,15 @@ export const generateDirections = createServerFn({ method: "POST" })
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) return { ok: false, error: "AI drafting is not available in this session." };
 
-    const count = data.mode === "refine" ? 1 : 3;
+    const count = data.mode === "seed" ? 3 : LEVEL_META[data.mode].count;
+    const plans = data.mode === "seed" || !data.parent ? null : plansFor(data.mode, Math.random, data.instruction);
+    const temperature =
+      data.mode === "polish" ? 0.35 : data.mode === "siblings" ? 0.55 : data.mode === "mutate" ? 0.7 : data.mode === "seed" ? 0.85 : 0.8;
     try {
       const payload = {
         model: "grok-4.5",
-        temperature: data.mode === "refine" ? 0.4 : 0.8,
-        max_tokens: count === 1 ? 2500 : 5500,
+        temperature,
+        max_tokens: count === 1 ? 2500 : 6000,
         reasoning_effort: "low" as const,
         response_format: {
           type: "json_schema" as const,
@@ -231,7 +263,7 @@ export const generateDirections = createServerFn({ method: "POST" })
         },
         messages: [
           { role: "system", content: SYSTEM },
-          { role: "user", content: userPrompt(data) },
+          { role: "user", content: userPrompt(data, plans) },
         ],
       };
 
@@ -271,11 +303,22 @@ export const generateDirections = createServerFn({ method: "POST" })
       } catch {
         return { ok: false, error: "The draft came back unreadable. Try again." };
       }
-      const directions = toSeeds(parsed).slice(0, count);
-      if (!directions.length) {
+      const drafted = toSeeds(parsed).slice(0, count);
+      if (!drafted.length) {
         return { ok: false, error: "The draft didn't include a usable palette. Try again." };
       }
-      return { ok: true, directions };
+      if (data.parent && plans) {
+        const directions = drafted.map((seed, index) =>
+          applyLineage(data.parent as DirectionSeed, seed, plans[index] ?? plans[0], index),
+        );
+        const lineage = directions.map((seed) => diffLineage(data.parent as DirectionSeed, seed, data.mode as Level));
+        return { ok: true, directions, lineage };
+      }
+      return {
+        ok: true,
+        directions: drafted,
+        lineage: drafted.map(() => ({ level: "seed" as const, kept: [], changed: [] })),
+      };
     } catch {
       return { ok: false, error: "Drafting didn't finish. Try again." };
     }

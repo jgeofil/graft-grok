@@ -64,7 +64,40 @@ export const RADII = ["0px", "2px", "8px", "16px", "24px", "999px"] as const;
 export const DENSITIES = ["tight", "balanced", "airy"] as const;
 
 export type Density = (typeof DENSITIES)[number];
-export type Origin = "seed" | "branch" | "refine";
+export type Origin =
+  | "seed"
+  | "branch"
+  | "refine"
+  | "polish"
+  | "mutate"
+  | "siblings"
+  | "remix"
+  | "creative"
+  | "cousins";
+
+export const ASPECTS = [
+  "palette",
+  "type",
+  "radius",
+  "density",
+  "voice",
+  "imagery",
+  "shape",
+  "motion",
+] as const;
+
+export type AspectId = (typeof ASPECTS)[number];
+
+export const ASPECT_LABEL: Record<AspectId, string> = {
+  palette: "Palette",
+  type: "Type",
+  radius: "Radius",
+  density: "Density",
+  voice: "Voice",
+  imagery: "Imagery",
+  shape: "Shape",
+  motion: "Motion",
+};
 
 export type PaletteColor = {
   role: ColorRole;
@@ -98,6 +131,10 @@ export type Direction = {
   createdAt: number;
   favorite: boolean;
   canon: boolean;
+  /** Aspects copied from the parent. Empty on opening directions. */
+  kept?: AspectId[];
+  /** Aspects this cut was allowed to move. */
+  changed?: AspectId[];
   title: string;
   epithet: string;
   rationale: string;
@@ -124,7 +161,7 @@ export type Direction = {
 
 export type DirectionSeed = Omit<
   Direction,
-  "id" | "projectId" | "parentId" | "origin" | "createdAt" | "favorite" | "canon"
+  "id" | "projectId" | "parentId" | "origin" | "createdAt" | "favorite" | "canon" | "kept" | "changed"
 >;
 
 const SERIF = new Set<string>([
@@ -139,6 +176,10 @@ const SERIF = new Set<string>([
   "Libre Baskerville",
   "DM Serif Display",
 ]);
+
+export function isSerifFont(family: string): boolean {
+  return SERIF.has(family);
+}
 
 const WEIGHTS: Record<string, string> = {
   Fraunces: "500;700",

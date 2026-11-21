@@ -1,11 +1,12 @@
 import { i as __toESM } from "../_runtime.mjs";
 import { J as require_react, x as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as TSS_SERVER_FUNCTION, r as getServerFnById, t as createServerFn } from "./ssr.mjs";
-import { a as TRAITS, c as columnsOf, d as finalizePalette, f as formatRatio, l as descendantIds, m as toSeeds, o as brandVars, p as slugify, r as ROLE_LABEL, s as colorOf, u as extraFontHref } from "./model-DHGwHpx0.mjs";
+import { d as colorOf, f as columnsOf, g as formatRatio, h as finalizePalette, l as TRAITS, m as extraFontHref, n as ASPECT_LABEL, p as descendantIds, s as ROLE_LABEL, u as brandVars, v as slugify, y as toSeeds } from "./model-BBCco-ZW.mjs";
+import { c as relationLine, l as relationTitle, n as LEVEL_META, o as isLevel, t as LEVELS } from "./lineage-DQ3j3A2H.mjs";
 import { r as Star, t as X } from "../_libs/lucide-react.mjs";
 import { n as toast, t as Toaster } from "../_libs/sonner.mjs";
 import { n as create, t as persist } from "../_libs/zustand.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-YWybau-x.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-BxmM1iJt.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var createSsrRpc = (functionId) => {
@@ -39,20 +40,24 @@ function parseBrief(value) {
 function parseParent(value) {
 	return toSeeds({ directions: [value] })[0];
 }
+function parseMode(value) {
+	if (value === "refine" || value === "polish") return "polish";
+	if (value === "branch" || value === "siblings") return "siblings";
+	if (typeof value === "string" && isLevel(value)) return value;
+	return "seed";
+}
 function parseInput(input) {
 	const record = input && typeof input === "object" ? input : {};
-	const mode = record.mode === "branch" || record.mode === "refine" ? record.mode : "seed";
+	const mode = parseMode(record.mode);
 	const brief = parseBrief(record.brief);
 	if (!brief.name || !brief.category) throw new Error("Add a name and what the brand is before drafting.");
 	const parent = mode === "seed" ? void 0 : parseParent(record.parent);
 	if (mode !== "seed" && !parent) throw new Error("Choose a direction to branch from.");
-	const instruction = clip(record.instruction, 400);
-	if (mode === "refine" && instruction.length < 3) throw new Error("Write an instruction to refine this direction.");
 	return {
 		mode,
 		brief,
 		parent,
-		instruction
+		instruction: clip(record.instruction, 400)
 	};
 }
 var aiAvailable = createServerFn({ method: "GET" }).handler(createSsrRpc("faa6b852513aa0fa6366ca38bd0e3246aca72570c1b1f49cd77e99b41a08a97d"));
@@ -330,7 +335,19 @@ var sampleDirections = [
 		...shared,
 		id: "dir_night",
 		parentId: "dir_fog",
-		origin: "refine",
+		origin: "remix",
+		kept: [
+			"type",
+			"radius",
+			"density",
+			"shape",
+			"motion"
+		],
+		changed: [
+			"palette",
+			"voice",
+			"imagery"
+		],
 		createdAt: 4,
 		favorite: true,
 		title: "Night Watch",
@@ -552,7 +569,7 @@ function BriefForm({ initial, pending, mode, onCancel, onSave, onDraft }) {
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 					className: "mt-3 max-w-md text-pretty text-muted",
-					children: "Three opening directions, different in color, type, and shape. Keep one, then branch or refine it."
+					children: "Three opening directions, different in color, type, and shape. Keep one, then branch it — closer levels leave more of the parent in place."
 				})
 			] }),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
@@ -808,14 +825,10 @@ function Board({ project, directions, selectedId, pending, ai, onSelect, onToggl
 												style: { color: "var(--b-muted)" },
 												children: direction.epithet
 											}),
-											parent ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+											parent ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 												className: "mt-2 block text-xs",
 												style: { color: "var(--b-muted)" },
-												children: [
-													direction.origin === "refine" ? "Refinement" : "Variation",
-													" from ",
-													parent.title
-												]
+												children: relationLine(direction.origin, parent.title, direction.kept, direction.changed)
 											}) : null,
 											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 												className: "g-stripe",
@@ -1002,8 +1015,9 @@ function cssExport(project, direction) {
 function exportBasename(project, direction) {
 	return `${slugify(project.brief.name)}-${slugify(direction.title)}`;
 }
-function SystemSheet({ project, direction, parent, pending, ai, notice, onClose, onToggleFavorite, onCanon, onBranch, onRefine, onRemove }) {
-	const [refineOpen, setRefineOpen] = (0, import_react.useState)(false);
+function SystemSheet({ project, direction, parent, pending, ai, notice, onClose, onToggleFavorite, onCanon, onBranch, onRemove }) {
+	const [level, setLevel] = (0, import_react.useState)("siblings");
+	const [noteOpen, setNoteOpen] = (0, import_react.useState)(false);
 	const [instruction, setInstruction] = (0, import_react.useState)("");
 	const [confirmRemove, setConfirmRemove] = (0, import_react.useState)(false);
 	const vars = brandVars(direction);
@@ -1012,6 +1026,14 @@ function SystemSheet({ project, direction, parent, pending, ai, notice, onClose,
 	const accent = colorOf(direction, "accent").hex;
 	const onAccent = colorOf(direction, "onAccent").hex;
 	const blocked = pending || ai === false;
+	const meta = LEVEL_META[level];
+	const kept = direction.kept ?? [];
+	const changed = direction.changed ?? [];
+	(0, import_react.useEffect)(() => {
+		setInstruction("");
+		setNoteOpen(false);
+		setConfirmRemove(false);
+	}, [direction.id]);
 	async function copy(text, label) {
 		try {
 			await navigator.clipboard.writeText(text);
@@ -1055,86 +1077,20 @@ function SystemSheet({ project, direction, parent, pending, ai, notice, onClose,
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mt-3 flex flex-col gap-2",
+				className: "mt-3 flex gap-2",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 					type: "button",
-					className: "g-btn g-btn-primary w-full",
-					disabled: blocked,
-					onClick: () => onBranch(refineOpen ? instruction.trim() : ""),
-					children: pending ? "Drafting…" : "Branch into 3"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "flex gap-2",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-						type: "button",
-						className: `g-btn g-btn-ghost min-w-0 flex-1${direction.favorite ? " is-on" : ""}`,
-						"aria-pressed": direction.favorite,
-						onClick: onToggleFavorite,
-						children: direction.favorite ? "Kept" : "Keep"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-						type: "button",
-						className: `g-btn g-btn-ghost min-w-0 flex-1${direction.canon ? " is-on" : ""}`,
-						"aria-pressed": direction.canon,
-						onClick: onCanon,
-						children: direction.canon ? "Clear system" : "Set system"
-					})]
+					className: `g-btn g-btn-ghost min-w-0 flex-1${direction.favorite ? " is-on" : ""}`,
+					"aria-pressed": direction.favorite,
+					onClick: onToggleFavorite,
+					children: direction.favorite ? "Kept" : "Keep"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: `g-btn g-btn-ghost min-w-0 flex-1${direction.canon ? " is-on" : ""}`,
+					"aria-pressed": direction.canon,
+					onClick: onCanon,
+					children: direction.canon ? "Clear system" : "Set system"
 				})]
-			}),
-			refineOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mt-3 flex flex-col gap-2",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
-						className: "text-sm",
-						htmlFor: "refine-note",
-						children: "Instruction"
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
-						id: "refine-note",
-						className: "g-field",
-						value: instruction,
-						maxLength: 400,
-						placeholder: "Keep the type. Move the field to night and quiet the accent.",
-						onChange: (event) => setInstruction(event.target.value)
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						className: "flex flex-wrap gap-2",
-						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-								type: "button",
-								className: "g-btn g-btn-primary",
-								disabled: blocked || instruction.trim().length < 3,
-								onClick: () => {
-									onRefine(instruction.trim());
-									setInstruction("");
-									setRefineOpen(false);
-								},
-								children: "Apply refinement"
-							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-								type: "button",
-								className: "g-btn g-btn-ghost",
-								disabled: blocked || instruction.trim().length < 3,
-								onClick: () => {
-									onBranch(instruction.trim());
-									setInstruction("");
-									setRefineOpen(false);
-								},
-								children: "Branch this way"
-							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-								type: "button",
-								className: "g-btn g-btn-quiet",
-								onClick: () => setRefineOpen(false),
-								children: "Cancel"
-							})
-						]
-					})
-				]
-			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-				type: "button",
-				className: "g-btn g-btn-quiet mt-1 px-0",
-				disabled: blocked,
-				onClick: () => setRefineOpen(true),
-				children: "Refine with an instruction"
 			}),
 			notice ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 				role: "alert",
@@ -1149,16 +1105,75 @@ function SystemSheet({ project, direction, parent, pending, ai, notice, onClose,
 				className: "text-sm text-muted",
 				children: direction.epithet
 			}),
-			parent ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+			parent ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 				className: "mt-1 text-sm text-muted",
-				children: [
-					direction.origin === "refine" ? "Refined" : "Branched",
-					" from ",
-					parent.title
-				]
+				children: relationTitle(direction.origin, parent.title)
 			}) : null,
+			kept.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "g-kicker mt-4",
+				children: ["Kept from ", parent?.title ?? "the parent"]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-1 text-sm",
+				children: kept.map((id) => ASPECT_LABEL[id]).join(" · ")
+			})] }) : null,
+			changed.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "g-kicker mt-3",
+				children: "Changed"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-1 text-sm",
+				children: changed.map((id) => ASPECT_LABEL[id]).join(" · ")
+			})] }) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-5 flex flex-col gap-2",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "g-kicker",
+						children: "Branch"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "g-levels",
+						role: "radiogroup",
+						"aria-label": "How far to branch",
+						children: LEVELS.map((id) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							role: "radio",
+							"aria-checked": level === id,
+							className: `g-chip${level === id ? " is-on" : ""}`,
+							disabled: blocked,
+							onClick: () => setLevel(id),
+							children: LEVEL_META[id].label
+						}, id))
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-sm text-pretty text-muted",
+						children: meta.hint
+					}),
+					noteOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+						id: "branch-note",
+						className: "g-field",
+						value: instruction,
+						maxLength: 400,
+						"aria-label": "Instruction",
+						placeholder: level === "polish" ? "Harmonize the yellow." : "Optional. Steers only the aspects this level is allowed to change.",
+						onChange: (event) => setInstruction(event.target.value)
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "g-btn g-btn-quiet px-0",
+						disabled: blocked,
+						onClick: () => setNoteOpen(true),
+						children: "Add an instruction"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "g-btn g-btn-primary w-full",
+						disabled: blocked,
+						onClick: () => onBranch(level, instruction.trim()),
+						children: pending ? "Drafting…" : meta.count === 1 ? "Polish this cut" : `${meta.label} into 3`
+					})
+				]
+			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-				className: "mt-3 text-pretty",
+				className: "mt-5 text-pretty",
 				children: direction.rationale
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", {
@@ -1669,7 +1684,7 @@ function Studio() {
 			setError("AI drafting is not available in this session.");
 			return;
 		}
-		const count = mode === "refine" ? 1 : 3;
+		const count = mode === "seed" ? 3 : LEVEL_META[mode].count;
 		const projectId = mode === "seed" && composer === "new" ? null : project?.id;
 		if ((projectId ? directions.filter((direction) => direction.projectId === projectId).length : 0) + count > DIRECTION_CAP) {
 			setError("This brand has 30 directions. Remove a few before drafting more.");
@@ -1680,7 +1695,7 @@ function Studio() {
 		setPending({
 			parentId: source?.id ?? null,
 			count,
-			label: mode === "refine" ? "Refining this cut…" : mode === "branch" ? "Growing a variation" : "Drafting a direction"
+			label: mode === "seed" ? "Drafting a direction" : LEVEL_META[mode].pending
 		});
 		let nextProjectId = project?.id ?? "";
 		if (mode === "seed" && composer === "new") {
@@ -1705,10 +1720,9 @@ function Studio() {
 				toast(result.error);
 				return;
 			}
-			const origin = mode === "seed" ? "seed" : mode;
-			addDirections(materialize(result.directions, nextProjectId, source?.id ?? null, origin));
+			addDirections(materialize(result.directions, result.lineage, nextProjectId, source?.id ?? null));
 			setPane("board");
-			toast(mode === "refine" ? "Refinement added" : mode === "branch" ? "Three variations added" : "Three directions added");
+			toast(mode === "seed" ? "Three directions added" : LEVEL_META[mode].toast);
 		} catch (caught) {
 			const message = caught instanceof Error ? caught.message : "Drafting failed.";
 			setError(message);
@@ -1955,8 +1969,7 @@ function Studio() {
 					},
 					onToggleFavorite: () => toggleFavorite(selected.id),
 					onCanon: () => setCanon(selected.id),
-					onBranch: (instruction) => void draft(project.brief, "branch", selected, instruction),
-					onRefine: (instruction) => void draft(project.brief, "refine", selected, instruction),
+					onBranch: (level, instruction) => void draft(project.brief, level, selected, instruction),
 					onRemove: () => {
 						removeDirection(selected.id);
 						setPane("board");
@@ -1986,18 +1999,24 @@ function seedOf(direction) {
 	const { id: _id, projectId: _projectId, parentId: _parentId, origin: _origin, createdAt: _createdAt, favorite: _favorite, canon: _canon, ...seed } = direction;
 	return seed;
 }
-function materialize(seeds, projectId, parentId, origin) {
+function materialize(seeds, lineage, projectId, parentId) {
 	const now = Date.now();
-	return seeds.map((seed, index) => ({
-		...seed,
-		id: `dir_${crypto.randomUUID().slice(0, 8)}`,
-		projectId,
-		parentId,
-		origin,
-		createdAt: now + index,
-		favorite: false,
-		canon: false
-	}));
+	return seeds.map((seed, index) => {
+		const mark = lineage[index];
+		const origin = mark?.level ?? "seed";
+		return {
+			...seed,
+			id: `dir_${crypto.randomUUID().slice(0, 8)}`,
+			projectId,
+			parentId,
+			origin,
+			kept: mark?.kept ?? [],
+			changed: mark?.changed ?? [],
+			createdAt: now + index,
+			favorite: false,
+			canon: false
+		};
+	});
 }
 var SplitComponent = Studio;
 //#endregion

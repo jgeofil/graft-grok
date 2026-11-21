@@ -65,7 +65,7 @@ export function BriefForm({
           {mode === "new" ? "Start from a brief." : brief.name || "Edit the brief."}
         </h1>
         <p className="mt-3 max-w-md text-pretty text-muted">
-          Three opening directions, different in color, type, and shape. Keep one, then branch or refine it.
+          Three opening directions, different in color, type, and shape. Keep one, then branch it — closer levels leave more of the parent in place.
         </p>
       </div>
 

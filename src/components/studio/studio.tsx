@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
 import { extraFontHref, type Brief, type Direction, type DirectionSeed, type Origin } from "@/lib/brand/model";
 import { aiAvailable, generateDirections } from "@/lib/brand/generate";
+import { LEVEL_META, type Level, type LineageMark } from "@/lib/brand/lineage";
 import { useStudio } from "@/lib/brand/store";
 import { BriefForm } from "@/components/studio/brief-form";
 import { Board, type PendingDraft } from "@/components/studio/board";
@@ -80,14 +81,14 @@ export function Studio() {
     setError("");
   }
 
-  async function draft(brief: Brief, mode: "seed" | "branch" | "refine", source?: Direction, instruction = "") {
+  async function draft(brief: Brief, mode: "seed" | Level, source?: Direction, instruction = "") {
     if (lock.current) return;
     if (!project && mode !== "seed") return;
     if (ai === false) {
       setError("AI drafting is not available in this session.");
       return;
     }
-    const count = mode === "refine" ? 1 : 3;
+    const count = mode === "seed" ? 3 : LEVEL_META[mode].count;
     const projectId = mode === "seed" && composer === "new" ? null : project?.id;
     const existing = projectId ? directions.filter((direction) => direction.projectId === projectId).length : 0;
     if (existing + count > DIRECTION_CAP) {
@@ -99,7 +100,7 @@ export function Studio() {
     setPending({
       parentId: source?.id ?? null,
       count,
-      label: mode === "refine" ? "Refining this cut…" : mode === "branch" ? "Growing a variation" : "Drafting a direction",
+      label: mode === "seed" ? "Drafting a direction" : LEVEL_META[mode].pending,
     });
     let nextProjectId = project?.id ?? "";
     if (mode === "seed" && composer === "new") {
@@ -127,10 +128,9 @@ export function Studio() {
         toast(result.error);
         return;
       }
-      const origin: Origin = mode === "seed" ? "seed" : mode;
-      addDirections(materialize(result.directions, nextProjectId, source?.id ?? null, origin));
+      addDirections(materialize(result.directions, result.lineage, nextProjectId, source?.id ?? null));
       setPane("board");
-      toast(mode === "refine" ? "Refinement added" : mode === "branch" ? "Three variations added" : "Three directions added");
+      toast(mode === "seed" ? "Three directions added" : LEVEL_META[mode].toast);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Drafting failed.";
       setError(message);
@@ -366,8 +366,7 @@ export function Studio() {
             }}
             onToggleFavorite={() => toggleFavorite(selected.id)}
             onCanon={() => setCanon(selected.id)}
-            onBranch={(instruction) => void draft(project.brief, "branch", selected, instruction)}
-            onRefine={(instruction) => void draft(project.brief, "refine", selected, instruction)}
+            onBranch={(level, instruction) => void draft(project.brief, level, selected, instruction)}
             onRemove={() => {
               removeDirection(selected.id);
               setPane("board");
@@ -401,16 +400,27 @@ function seedOf(direction: Direction): DirectionSeed {
   return seed;
 }
 
-function materialize(seeds: DirectionSeed[], projectId: string, parentId: string | null, origin: Origin): Direction[] {
+function materialize(
+  seeds: DirectionSeed[],
+  lineage: LineageMark[],
+  projectId: string,
+  parentId: string | null,
+): Direction[] {
   const now = Date.now();
-  return seeds.map((seed, index) => ({
-    ...seed,
-    id: `dir_${crypto.randomUUID().slice(0, 8)}`,
-    projectId,
-    parentId,
-    origin,
-    createdAt: now + index,
-    favorite: false,
-    canon: false,
-  }));
+  return seeds.map((seed, index) => {
+    const mark = lineage[index];
+    const origin: Origin = mark?.level ?? "seed";
+    return {
+      ...seed,
+      id: `dir_${crypto.randomUUID().slice(0, 8)}`,
+      projectId,
+      parentId,
+      origin,
+      kept: mark?.kept ?? [],
+      changed: mark?.changed ?? [],
+      createdAt: now + index,
+      favorite: false,
+      canon: false,
+    };
+  });
 }

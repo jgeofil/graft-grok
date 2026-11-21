@@ -1,5 +1,6 @@
 import { Star } from "lucide-react";
 import { brandVars, columnsOf, type Direction, type Project } from "@/lib/brand/model";
+import { relationLine } from "@/lib/brand/lineage";
 
 export type PendingDraft = {
   parentId: string | null;
@@ -115,7 +116,7 @@ export function Board({
                         </span>
                         {parent ? (
                           <span className="mt-2 block text-xs" style={{ color: "var(--b-muted)" }}>
-                            {direction.origin === "refine" ? "Refinement" : "Variation"} from {parent.title}
+                            {relationLine(direction.origin, parent.title, direction.kept, direction.changed)}
                           </span>
                         ) : null}
                         <span className="g-stripe" aria-hidden="true">

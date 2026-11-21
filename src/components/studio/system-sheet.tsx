@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import {
+  ASPECT_LABEL,
   ROLE_LABEL,
   brandVars,
   colorOf,
@@ -9,6 +10,7 @@ import {
   type Direction,
   type Project,
 } from "@/lib/brand/model";
+import { LEVELS, LEVEL_META, relationTitle, type Level } from "@/lib/brand/lineage";
 import { cssExport, exportBasename, markdownOf } from "@/lib/brand/export";
 
 export function SystemSheet({
@@ -22,7 +24,6 @@ export function SystemSheet({
   onToggleFavorite,
   onCanon,
   onBranch,
-  onRefine,
   onRemove,
 }: {
   project: Project;
@@ -34,11 +35,11 @@ export function SystemSheet({
   onClose: () => void;
   onToggleFavorite: () => void;
   onCanon: () => void;
-  onBranch: (instruction: string) => void;
-  onRefine: (instruction: string) => void;
+  onBranch: (level: Level, instruction: string) => void;
   onRemove: () => void;
 }) {
-  const [refineOpen, setRefineOpen] = useState(false);
+  const [level, setLevel] = useState<Level>("siblings");
+  const [noteOpen, setNoteOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
   const vars = brandVars(direction);
@@ -47,6 +48,15 @@ export function SystemSheet({
   const accent = colorOf(direction, "accent").hex;
   const onAccent = colorOf(direction, "onAccent").hex;
   const blocked = pending || ai === false;
+  const meta = LEVEL_META[level];
+  const kept = direction.kept ?? [];
+  const changed = direction.changed ?? [];
+
+  useEffect(() => {
+    setInstruction("");
+    setNoteOpen(false);
+    setConfirmRemove(false);
+  }, [direction.id]);
 
   async function copy(text: string, label: string) {
     try {
@@ -82,82 +92,24 @@ export function SystemSheet({
             <X className="size-4" />
           </button>
         </div>
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-3 flex gap-2">
           <button
             type="button"
-            className="g-btn g-btn-primary w-full"
-            disabled={blocked}
-            onClick={() => onBranch(refineOpen ? instruction.trim() : "")}
+            className={`g-btn g-btn-ghost min-w-0 flex-1${direction.favorite ? " is-on" : ""}`}
+            aria-pressed={direction.favorite}
+            onClick={onToggleFavorite}
           >
-            {pending ? "Drafting…" : "Branch into 3"}
+            {direction.favorite ? "Kept" : "Keep"}
           </button>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`g-btn g-btn-ghost min-w-0 flex-1${direction.favorite ? " is-on" : ""}`}
-              aria-pressed={direction.favorite}
-              onClick={onToggleFavorite}
-            >
-              {direction.favorite ? "Kept" : "Keep"}
-            </button>
-            <button
-              type="button"
-              className={`g-btn g-btn-ghost min-w-0 flex-1${direction.canon ? " is-on" : ""}`}
-              aria-pressed={direction.canon}
-              onClick={onCanon}
-            >
-              {direction.canon ? "Clear system" : "Set system"}
-            </button>
-          </div>
+          <button
+            type="button"
+            className={`g-btn g-btn-ghost min-w-0 flex-1${direction.canon ? " is-on" : ""}`}
+            aria-pressed={direction.canon}
+            onClick={onCanon}
+          >
+            {direction.canon ? "Clear system" : "Set system"}
+          </button>
         </div>
-        {refineOpen ? (
-          <div className="mt-3 flex flex-col gap-2">
-            <label className="text-sm" htmlFor="refine-note">
-              Instruction
-            </label>
-            <textarea
-              id="refine-note"
-              className="g-field"
-              value={instruction}
-              maxLength={400}
-              placeholder="Keep the type. Move the field to night and quiet the accent."
-              onChange={(event) => setInstruction(event.target.value)}
-            />
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="g-btn g-btn-primary"
-                disabled={blocked || instruction.trim().length < 3}
-                onClick={() => {
-                  onRefine(instruction.trim());
-                  setInstruction("");
-                  setRefineOpen(false);
-                }}
-              >
-                Apply refinement
-              </button>
-              <button
-                type="button"
-                className="g-btn g-btn-ghost"
-                disabled={blocked || instruction.trim().length < 3}
-                onClick={() => {
-                  onBranch(instruction.trim());
-                  setInstruction("");
-                  setRefineOpen(false);
-                }}
-              >
-                Branch this way
-              </button>
-              <button type="button" className="g-btn g-btn-quiet" onClick={() => setRefineOpen(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button type="button" className="g-btn g-btn-quiet mt-1 px-0" disabled={blocked} onClick={() => setRefineOpen(true)}>
-            Refine with an instruction
-          </button>
-        )}
         {notice ? (
           <p role="alert" className="mt-3 text-sm">
             {notice}
@@ -167,11 +119,65 @@ export function SystemSheet({
       <div className="g-sheet-body">
         <p className="text-sm text-muted">{direction.epithet}</p>
         {parent ? (
-          <p className="mt-1 text-sm text-muted">
-            {direction.origin === "refine" ? "Refined" : "Branched"} from {parent.title}
-          </p>
+          <p className="mt-1 text-sm text-muted">{relationTitle(direction.origin, parent.title)}</p>
         ) : null}
-        <p className="mt-3 text-pretty">{direction.rationale}</p>
+        {kept.length > 0 ? (
+          <>
+            <p className="g-kicker mt-4">Kept from {parent?.title ?? "the parent"}</p>
+            <p className="mt-1 text-sm">{kept.map((id) => ASPECT_LABEL[id]).join(" · ")}</p>
+          </>
+        ) : null}
+        {changed.length > 0 ? (
+          <>
+            <p className="g-kicker mt-3">Changed</p>
+            <p className="mt-1 text-sm">{changed.map((id) => ASPECT_LABEL[id]).join(" · ")}</p>
+          </>
+        ) : null}
+
+        <div className="mt-5 flex flex-col gap-2">
+          <p className="g-kicker">Branch</p>
+          <div className="g-levels" role="radiogroup" aria-label="How far to branch">
+            {LEVELS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={level === id}
+                className={`g-chip${level === id ? " is-on" : ""}`}
+                disabled={blocked}
+                onClick={() => setLevel(id)}
+              >
+                {LEVEL_META[id].label}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-pretty text-muted">{meta.hint}</p>
+          {noteOpen ? (
+            <textarea
+              id="branch-note"
+              className="g-field"
+              value={instruction}
+              maxLength={400}
+              aria-label="Instruction"
+              placeholder={level === "polish" ? "Harmonize the yellow." : "Optional. Steers only the aspects this level is allowed to change."}
+              onChange={(event) => setInstruction(event.target.value)}
+            />
+          ) : (
+            <button type="button" className="g-btn g-btn-quiet px-0" disabled={blocked} onClick={() => setNoteOpen(true)}>
+              Add an instruction
+            </button>
+          )}
+          <button
+            type="button"
+            className="g-btn g-btn-primary w-full"
+            disabled={blocked}
+            onClick={() => onBranch(level, instruction.trim())}
+          >
+            {pending ? "Drafting…" : meta.count === 1 ? "Polish this cut" : `${meta.label} into 3`}
+          </button>
+        </div>
+
+        <p className="mt-5 text-pretty">{direction.rationale}</p>
 
         <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <Jump id="g-palette" label="Palette" />
